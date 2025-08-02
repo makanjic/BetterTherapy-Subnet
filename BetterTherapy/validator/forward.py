@@ -119,4 +119,4 @@ Example:{"question":"<mental health question>","answer":"<empathetic answer>"}
     else:
         bt.logging.warning(f"No responses received for request {request_id}")
     self.update_scores(np.array(full_rewards), miner_uids.tolist())
-    time.sleep(5 * 60)  # every 5 minutes
+    time.sleep(10 * 60)  # every 5 minutes
