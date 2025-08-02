@@ -21,7 +21,7 @@ import numpy as np
 from neurons import validator
 
 
-def reward(
+async def reward(
     self: validator.Validator, prompt: str, base_response: str, responses: list[str]
 ) -> np.ndarray:
     """
@@ -31,14 +31,16 @@ def reward(
     Returns:
     - np.ndarray: The reward value for the miner.
     """
-    scores = self.evals.judge_responses(prompt, base_response, responses)
+    scores = await self.evals.judge_responses(
+        prompt, base_response, responses, self.config
+    )
     bt.logging.info(
         f"In rewards, prompt val: {prompt}, responses val len: {len(responses)}, scores val: {scores}"
     )
     return scores
 
 
-def get_rewards(
+async def get_rewards(
     self: validator.Validator,
     prompt: str,
     base_response: str,
@@ -83,13 +85,13 @@ def get_rewards(
         return np.array([])
 
     if len(responses) <= max_batch_size:
-        scores = reward(self, prompt, base_response, responses)
+        scores = await reward(self, prompt, base_response, responses)
         return np.array(scores)
 
     all_scores = []
     for i in range(0, len(responses), max_batch_size):
         batch_responses = [resp for resp in responses[i : i + max_batch_size]]
-        batch_scores = reward(self, prompt, base_response, batch_responses)
+        batch_scores = await reward(self, prompt, base_response, batch_responses)
         all_scores.extend(batch_scores)
         bt.logging.info(
             f"Processed batch {i // max_batch_size + 1}/{(len(responses) + max_batch_size - 1) // max_batch_size} "
