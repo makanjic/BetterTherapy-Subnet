@@ -26,7 +26,7 @@ def check_uid_availability(
     return True
 
 
-def get_random_uids(self, k: int, exclude: list[int] = None) -> np.ndarray:
+def get_available_uids(self, k: int, exclude: list[int] = None) -> np.ndarray:
     """Returns k available random uids from the metagraph.
     Args:
         k (int): Number of uids to return.
@@ -58,5 +58,5 @@ def get_random_uids(self, k: int, exclude: list[int] = None) -> np.ndarray:
             [uid for uid in avail_uids if uid not in candidate_uids],
             k - len(candidate_uids),
         )
-    uids = np.array(random.sample(available_uids, k))
+    uids = np.array(avail_uids)
     return uids
