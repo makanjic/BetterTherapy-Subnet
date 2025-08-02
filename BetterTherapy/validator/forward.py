@@ -132,4 +132,4 @@ async def forward(self: validator.Validator):
         bt.logging.error(f"Error in forward pass: {e}")
         bt.logging.error(traceback.format_exc())
     finally:
-        time.sleep(10 * 60)  # every 10 minutes
+        time.sleep(1 * 60 * 60)  # every 1 hr
