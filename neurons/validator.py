@@ -96,5 +96,5 @@ class Validator(BaseValidatorNeuron):
 if __name__ == "__main__":
     with Validator() as validator:
         while True:
-            bt.logging.info(f"Incentive: {validator.metagraph.I[validator.uid]}")
-            time.sleep(5)
+            bt.logging.info(f"Dividend: {validator.metagraph.D[validator.uid]}")
+            time.sleep(5 * 60)
