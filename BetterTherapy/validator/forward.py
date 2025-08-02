@@ -40,7 +40,7 @@ async def forward(self: validator.Validator):
     """
     # Define how the validator selects a miner to query, how often, etc.
     # get_random_uids is an example method, but you can replace it with your own.
-    miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+    miner_uids = get_random_uids(self, k=256)
 
     # The dendrite client queries the network.
     prompt_for_vali = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>  
