@@ -2,6 +2,7 @@ import json
 
 import bittensor as bt
 from openai import OpenAI
+import aiohttp
 
 
 class OpenAILLMAsJudgeEval:
@@ -9,8 +10,8 @@ class OpenAILLMAsJudgeEval:
         self.judge_client = OpenAI(api_key=api_key)
         self.judge_model = judge_model
 
-    def judge_responses(
-        self, prompt: str, base_response: str, responses: list[str]
+    async def judge_responses(
+        self, prompt: str, base_response: str, responses: list[str], config
     ) -> list[float]:
         """
         Use LLM-as-Judge to determine numerical scores for each miner's response compared to the base response.
@@ -59,4 +60,12 @@ class OpenAILLMAsJudgeEval:
                 return [0.0] * len(responses)
         except Exception as e:
             bt.logging.error(f"LLM judge error: {e}")
+            if config.discord.webhook:
+                async with aiohttp.ClientSession() as session:
+                    await session.post(
+                        config.discord.webhook,
+                        json={
+                            "content": f"Error in validator: {e}",
+                        },
+                    )
             return [0.0] * len(responses)

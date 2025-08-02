@@ -280,8 +280,6 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def resync_metagraph(self):
         """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
-        bt.logging.info("resync_metagraph()")
-
         # Copies state of metagraph before syncing.
         previous_metagraph = copy.deepcopy(self.metagraph)
 

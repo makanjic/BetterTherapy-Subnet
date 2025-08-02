@@ -23,6 +23,10 @@ import subprocess
 import bittensor as bt
 
 from .logging import setup_events_logger
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 
 def is_cuda_available():
@@ -249,8 +253,15 @@ def add_validator_args(cls, parser):
     parser.add_argument(
         "--model.name",
         type=str,
-        help="The name of the project where you are sending the new run.",
+        help="The base model you are running",
         default="meta-llama/Llama-3.1-8B",
+    )
+
+    parser.add_argument(
+        "--discord.webhook",
+        type=str,
+        help="Discord webhook URL for sending notifications.",
+        default=os.environ.get("DISCORD_WEBHOOK_URL", None),
     )
 
 

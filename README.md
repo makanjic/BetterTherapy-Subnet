@@ -224,6 +224,44 @@ This project uses [Weights & Biases (wandb)](https://wandb.ai/) for experiment t
    export WANDB_API_KEY=your_api_key_here
    ```
 
+## Discord Notifications
+
+The subnet supports Discord webhook notifications for LLM judge failure
+
+### Setup Discord Webhook
+
+1. **Create a Discord Webhook:**
+
+   - Go to your Discord server settings
+   - Navigate to Integrations → Webhooks
+   - Create a new webhook and copy the webhook URL
+
+2. **Configure the Webhook URL:**
+
+   **Option 1: Environment Variable**
+
+   ```bash
+   export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+   ```
+
+   **Option 2: .env File**
+   Create or update your `.env` file:
+
+   ```
+   DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+   ```
+
+   **Option 3: Command Line Argument**
+
+   ```bash
+   uv run neurons/validator.py \
+     --discord.webhook "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL" \
+     --netuid 354 --subtensor.network test \
+     --wallet.name validator --wallet.hotkey default
+   ```
+
+### Start Validator Locally
+
 To start a validator (after setting up wallets and registering on your subnet):
 
 The validator will automatically create and manage runs, groups, and dashboards in wandb. See `BetterTherapy/utils/wandb.py` for advanced usage.
@@ -273,6 +311,58 @@ pm2 delete bt-test-vali
 - Replace `<network>` with your chain endpoint (e.g., `test` for local, or use `finney` for mainnet).
 
 The validator will automatically log evaluation metrics and charts to wandb.
+
+---
+
+## Auto-Updater
+
+The BetterTherapy subnet includes an auto-updater script that automatically checks for updates, pulls the latest changes, updates dependencies, and restarts your application. This is particularly useful for production deployments.
+
+### Using the Auto-Updater
+
+The auto-updater script is located at `scripts/autoupdater.py` and provides the following features:
+
+- Checks for updates from the remote repository
+- Pulls the latest changes from the specified branch
+- Updates Python dependencies using `uv`
+- Optionally restarts your application using a custom command
+
+### Basic Usage
+
+```bash
+# Basic update check and pull
+python scripts/autoupdater.py
+
+# Specify custom repository path and branch
+python scripts/autoupdater.py --repo-path /path/to/repo --branch main
+
+# Auto-restart PM2 process after update
+python scripts/autoupdater.py --restart-command "pm2 restart bt-test-vali"
+
+# Force update even if not on default branch
+python scripts/autoupdater.py --force
+```
+
+### Command Line Options
+
+- `--repo-path`: Path to the repository (default: current directory)
+- `--branch`: Branch to pull from (default: main)
+- `--restart-command`: Command to restart the application (e.g., PM2 restart command)
+- `--force`: Force update even if not on the default branch
+
+### Automated Updates with Cron
+
+You can set up automated updates using cron jobs:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add entry to check for updates every hour
+0 * * * * cd /path/to/bittensor-subnet-template && python scripts/autoupdater.py --restart-command "pm2 restart bt-test-vali" >> /var/log/autoupdate.log 2>&1
+```
+
+The auto-updater logs all activities to `autoupdate.log` for monitoring and debugging.
 
 ---
 

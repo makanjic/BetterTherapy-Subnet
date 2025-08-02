@@ -52,7 +52,7 @@ class Validator(BaseValidatorNeuron):
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set.")
         self.evals = OpenAILLMAsJudgeEval(api_key=api_key, judge_model="gpt-4")
-        self.evals_token_limit = 7000 # Excluding the buffer for system message, instructions, and formatting
+        self.evals_token_limit = 7000  # Excluding the buffer for system message, instructions, and formatting
 
     def setup_wandb(self):
         config_dir = os.path.expanduser("~/.bittensor/wandb")
@@ -96,5 +96,5 @@ class Validator(BaseValidatorNeuron):
 if __name__ == "__main__":
     with Validator() as validator:
         while True:
-            bt.logging.info(f"Validator running... {time.time()}")
+            bt.logging.info(f"Incentive: {validator.metagraph.I[validator.uid]}")
             time.sleep(5)
