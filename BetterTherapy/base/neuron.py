@@ -101,6 +101,7 @@ class BaseNeuron(ABC):
         )
         self.step = 0
         self._last_updated_block = self.metagraph.last_update[self.uid]
+        self._last_synced_block = self.metagraph.last_update[self.uid]
 
     @abstractmethod
     async def forward(self, synapse: bt.Synapse) -> bt.Synapse: ...
@@ -117,7 +118,7 @@ class BaseNeuron(ABC):
 
         if self.should_sync_metagraph():
             self.resync_metagraph()
-            self._last_updated_block = self.block
+            self._last_synced_block = self.block
 
         if self.should_set_weights():
             self.set_weights()
@@ -142,7 +143,7 @@ class BaseNeuron(ABC):
         """
         Check if enough epoch blocks have elapsed since the last checkpoint to sync.
         """
-        elapsed = self.block - self._last_updated_block
+        elapsed = self.block - self._last_synced_block
 
         # Only set weights if epoch has passed
         return elapsed > self.config.neuron.epoch_length
