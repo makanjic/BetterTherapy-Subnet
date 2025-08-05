@@ -41,7 +41,7 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)  # noqa: UP008
-        self.setup_model(config)
+        self.setup_model()
         bt.logging.info(f"Miner initialized with uid: {self.uid}")
 
     def setup_model(self):
