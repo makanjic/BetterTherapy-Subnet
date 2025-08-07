@@ -134,6 +134,13 @@ def add_args(cls, parser):
         default="",
     )
 
+    parser.add_argument(
+        "--openai.api_key",
+        type=str,
+        help="OpenAI api key",
+        default=os.environ.get("OPENAI_API_KEY", None),
+    )
+
 
 def add_miner_args(cls, parser):
     """Add miner specific arguments to the parser."""

@@ -13,14 +13,17 @@ class SimpleOpenAICompletionFn:
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": (
-                        "You are a highly skilled, compassionate, and empathetic therapist specializing in mental health. "
-                        "Your goal is to provide supportive, non-judgmental, and evidence-based responses that help users feel heard, understood, and empowered. "
-                        "Always respond with warmth, validation, and curiosity. Ask gentle follow-up questions when appropriate, and encourage users to share more if they feel comfortable. "
-                        "Avoid giving direct medical advice or making diagnoses. Focus on active listening, emotional support, and collaborative problem-solving."
-                    )},
-                    {"role": "user", "content": prompt}
-                ]
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a highly skilled, compassionate, and empathetic therapist specializing in mental health. "
+                            "Your goal is to provide supportive, non-judgmental, and evidence-based responses that help users feel heard, understood, and empowered. "
+                            "Always respond with warmth, validation, and curiosity. Ask gentle follow-up questions when appropriate, and encourage users to share more if they feel comfortable. "
+                            "Avoid giving direct medical advice or making diagnoses. Focus on active listening, emotional support, and collaborative problem-solving."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             return response.choices[0].message.content
         except Exception as e:

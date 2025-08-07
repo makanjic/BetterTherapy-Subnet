@@ -27,6 +27,14 @@ from BetterTherapy.utils.uids import get_available_uids
 from BetterTherapy.validator.reward import get_rewards
 from neurons import validator
 import traceback
+from BetterTherapy.db.query import (
+    get_ready_requests,
+    add_request,
+    add_bulk_responses,
+    delete_requests,
+)
+from BetterTherapy.db.models import MinerResponse
+import json
 
 
 async def forward(self: validator.Validator):
@@ -42,7 +50,7 @@ async def forward(self: validator.Validator):
     # Define how the validator selects a miner to query, how often, etc.
     # get_random_uids is an example method, but you can replace it with your own.
     try:
-        miner_uids = get_available_uids(self, k=256)
+        miner_uids = [10, 11]
         # The dendrite client queries the network.
         prompt_for_vali = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>  
     You are a compassionate mental health assistant.  
@@ -80,54 +88,152 @@ async def forward(self: validator.Validator):
             deserialize=True,
             timeout=500,
         )
-
-        bt.logging.info(f"Received total responses: {len(responses)}")
-
-        rewards = await get_rewards(self, prompt, base_response, responses=responses)
-        responses_data = []
-        full_rewards = []
-        for resp, uid, reward in zip(responses, miner_uids, rewards, strict=False):
-            if (
-                resp.output is None
-                or resp.output == ""
-                or reward is None
-                or reward == 0
-            ):
-                full_rewards.append(0)
-                continue
-            response_time_score = 0
-            if reward > 0.2:
-                if resp.dendrite.process_time < 10:
-                    response_time_score = 100
-                elif resp.dendrite.process_time < 20:
-                    response_time_score = 50
-                elif resp.dendrite.process_time < 30:
-                    response_time_score = 20
-            response_time_score = response_time_score * 0.3  # 30% of the score
-            quality_score = reward * 100 * 0.7  # 70% of the score
-            total_score = response_time_score + quality_score
-            full_rewards.append(total_score)
-            responses_data.append(
-                {
-                    "request_id": request_id,
-                    "miner_id": uid,
-                    "hotkey": self.metagraph.hotkeys[uid],
-                    "coldkey": self.metagraph.coldkeys[uid],
-                    "prompt": prompt,
-                    "response": resp.output,
-                    "base_response": base_response,
-                    "response_time": resp.dendrite.process_time,
-                    "response_time_score": response_time_score,
-                    "quality_score": quality_score,
-                    "total_score": total_score,
-                }
+        bt.logging.info(
+            f"Received total responses: {len(responses)}, batching them and queueing them to openai"
+        )
+        if responses:
+            batch_reponses, batch_metadata = self.batch_evals.create_batch(
+                prompt, base_response, request_id, responses, miner_uids.tolist()
             )
-        if len(responses_data) > 0:
-            self.wandb_logger.log_evaluation_round(prompt, request_id, responses_data)
+            openai_batch_response = self.batch_evals.queue_batch(
+                batch=batch_reponses, batch_metadata=batch_metadata
+            )
+            new_request = add_request(
+                name=request_id,
+                openai_batch_id=openai_batch_response.id,
+                prompt=prompt,
+                base_response=base_response,
+            )
+            miner_responses = []
+
+            for resp, miner_uid in zip(responses, miner_uids):
+
+                miner_responses.append(
+                    MinerResponse(
+                        request_id=new_request.id,
+                        miner_id=miner_uid,
+                        response_text=resp.output,
+                        response_time=resp.dendrite.process_time,
+                    )
+                )
+            add_bulk_responses(responses=miner_responses)
+
+        ready_requests = get_ready_requests()
+        if ready_requests:
+            processed_request_ids = []
+            judged_responses = []
+            miner_scores = {}
+            bt.logging.info(
+                f"Found {len(ready_requests)} requests ready for processing."
+            )
+            for req in ready_requests:
+                miner_db_response = {
+                    item.miner_id: {
+                        "response_text": item.response_text,
+                        "response_time": item.response_time,
+                    }
+                    for item in req.responses
+                }
+                bt.logging.info(
+                    f"Processing batch request {req.openai_batch_id} created at {req.created_at} with prompt: {req.prompt}"
+                )
+                openai_batch, batch_info = self.batch_evals.query_batch(
+                    batch_id=req.openai_batch_id
+                )
+                if openai_batch:
+                    for eval in openai_batch:
+                        parsed_eval = json.loads(eval.strip())
+                        custom_id = parsed_eval.get("custom_id", "")
+                        if (
+                            custom_id
+                            and parsed_eval.get("response", "").get("status_code")
+                            == 200
+                        ):
+                            parsed_miners = batch_info.metadata[custom_id].split(",")
+                            miner_evaluation = parsed_eval.response.body.choices[
+                                0
+                            ].message.content
+                        try:
+                            result = json.loads(miner_evaluation)
+                            scores = result.get(
+                                "scores",
+                                [0.0] * len(parsed_miners),
+                            )
+                            for score, miner_uid in zip(
+                                scores,
+                                parsed_miners,
+                            ):
+                                miner_uid = int(miner_uid)
+                                bounded_score = max(0.0, min(1.0, float(score)))
+                                if bounded_score == 0.0:
+                                    total_score = 0.0
+                                elif bounded_score > 0.2:
+                                    response_time_score = 0
+                                    if (
+                                        miner_db_response.get(miner_uid, None).get(
+                                            "response_time", 500
+                                        )
+                                        < 10
+                                    ):
+                                        response_time_score = 100
+                                    elif (
+                                        miner_db_response.get(miner_uid, None).get(
+                                            "response_time", 500
+                                        )
+                                        < 20
+                                    ):
+                                        response_time_score = 50
+                                    elif (
+                                        miner_db_response.get(miner_uid, None).get(
+                                            "response_time", 500
+                                        )
+                                        < 30
+                                    ):
+                                        response_time_score = 20
+                                    total_score = (
+                                        bounded_score * 100 * 0.7
+                                        + response_time_score * 0.3
+                                    )
+                                judged_responses.append(
+                                    {
+                                        "request_id": req.get("name", ""),
+                                        "miner_id": miner_uid,
+                                        "hotkey": self.metagraph.hotkeys[miner_uid],
+                                        "coldkey": self.metagraph.coldkeys[miner_uid],
+                                        "prompt": prompt,
+                                        "response": miner_db_response[miner_uid].get(
+                                            "response_text", ""
+                                        ),
+                                        "base_response": req.get("base_response", ""),
+                                        "response_time": miner_db_response[
+                                            miner_uid
+                                        ].get("response_time", 500),
+                                        "response_time_score": response_time_score,
+                                        "quality_score": bounded_score * 100,
+                                        "total_score": total_score,
+                                    }
+                                )
+
+                                miner_scores[miner_uid] = (
+                                    miner_scores.get(miner_uid, 0.0) + total_score
+                                )
+                                processed_request_ids.append(req.id)
+
+                        except Exception as e:
+                            bt.logging.error(
+                                f"Error parsing judge JSON: {e}, content: {parsed_eval}"
+                            )
+
+                # Here you can add logic to process each request as needed.
+
+        if judged_responses:
+            self.wandb_logger.log_evaluation_round(prompt, request_id, judged_responses)
             self.wandb_logger.create_summary_dashboard()
         else:
             bt.logging.warning(f"No responses received for request {request_id}")
-        self.update_scores(np.array(full_rewards), miner_uids.tolist())
+        if miner_scores:
+            self.update_scores(np.array(miner_scores.keys()), miner_scores.values())
+            delete_requests(request_ids=processed_request_ids)
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
         bt.logging.error(traceback.format_exc())

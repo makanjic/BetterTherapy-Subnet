@@ -8,6 +8,7 @@ import bittensor as bt
 import torch
 from dotenv import load_dotenv
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from ulid import api
 
 # import base validator class which takes care of most of the boilerplate
 from BetterTherapy.base.validator import BaseValidatorNeuron
@@ -16,6 +17,7 @@ from BetterTherapy.base.validator import BaseValidatorNeuron
 from BetterTherapy.utils.wandb import SubnetEvaluationLogger
 from BetterTherapy.validator import forward
 from evals.eval import OpenAILLMAsJudgeEval
+from evals.batch import OpenAIBatchLLMAsJudgeEval
 
 
 class Validator(BaseValidatorNeuron):
@@ -35,6 +37,7 @@ class Validator(BaseValidatorNeuron):
         self.setup_wandb()
         self.setup_model()
         self.setup_evals()
+        self.setup_batch_evals()
         bt.logging.info(f"Validator initialized with uid: {self.uid}")
 
     def setup_model(self):
@@ -45,6 +48,16 @@ class Validator(BaseValidatorNeuron):
         self.model.eval()
         if torch.cuda.is_available():
             self.model.to("cuda")
+
+    def setup_batch_evals(self):
+        api_key = self.config.openai.api_key
+        if api_key is None:
+            raise ValueError(
+                "OPENAI_API_KEY not set. Set it either in env(OPENAI_API_KEY) or using args --openai.api_key"
+            )
+        self.batch_evals = OpenAIBatchLLMAsJudgeEval(
+            api_key=api_key, judge_model="gpt-4"
+        )
 
     def setup_evals(self):
         load_dotenv()

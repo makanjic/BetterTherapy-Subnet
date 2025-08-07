@@ -145,7 +145,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
                 # Run multiple forwards concurrently.
                 self.loop.run_until_complete(self.concurrent_forward())
-
+                
                 # Check if we should exit.
                 if self.should_exit:
                     break
