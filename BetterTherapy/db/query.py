@@ -1,8 +1,8 @@
 from .session import session
 from .models import Request, MinerResponse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import typing
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 
 # get request with greater than or equal to 24 hours old
@@ -10,8 +10,14 @@ from sqlalchemy.orm import Session
 def get_ready_requests(session: Session, hours: int = 24) -> typing.List[Request]:
     """Get requests that are older than the specified number of hours."""
 
-    threshold = datetime.now() - timedelta(hours=hours)
-    return session.query(Request).filter(Request.created_at < threshold).all()
+    threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
+    # attach responses to the requests
+    return (
+        session.query(Request)
+        .filter(Request.created_at < threshold)
+        .options(selectinload(Request.responses))
+        .all()
+    )
 
 
 @session
@@ -27,6 +33,7 @@ def add_request(
     )
     session.add(new_request)
     session.commit()
+    session.refresh(new_request)
     return new_request
 
 

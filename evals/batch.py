@@ -11,8 +11,8 @@ class OpenAIBatchLLMAsJudgeEval:
         self.judge_model = judge_model
         self.base_response = None
 
-    async def create_judge_prompt(
-        self, prompt: str, base_response: str, responses: list[str], config
+    def create_judge_prompt(
+        self, prompt: str, base_response: str, responses: list[str]
     ) -> list[float]:
         """
         Use LLM-as-Judge to determine numerical scores for each miner's response compared to the base response.
@@ -59,10 +59,11 @@ class OpenAIBatchLLMAsJudgeEval:
         max_words_per_batch = 5500
         batch_metadata = {}
         request_number = 1
-        for response, miner_uid in zip(responses, miner_uids):
-            response_word_count = count_words(response) if response else 0
-
-            if current_word_count + response_word_count > max_words_per_batch:
+        for i, (response, miner_uid) in enumerate(zip(responses, miner_uids)):
+            response_word_count = count_words(response.output) if response.output else 0
+            if (current_word_count + response_word_count > max_words_per_batch) or (
+                current_word_count and i == min(len(responses) - 1, len(miner_uids) - 1)
+            ):
                 custom_id = f"{request_id}_{request_number}"
                 request = {
                     "custom_id": custom_id,
@@ -97,7 +98,7 @@ class OpenAIBatchLLMAsJudgeEval:
 
             else:
                 current_batch_miner_uids.append(miner_uid)
-                current_batch_responses.append(response)
+                current_batch_responses.append(response.output)
                 current_word_count += response_word_count
         return batch, batch_metadata
 
@@ -117,6 +118,7 @@ class OpenAIBatchLLMAsJudgeEval:
             completion_window="24h",
             metadata=batch_metadata,
         )
+        bt.logging.info(f"Batch queued with ID: {queue_response.id}")
         return queue_response
 
     def query_batch(self, batch_id: str):
@@ -127,6 +129,6 @@ class OpenAIBatchLLMAsJudgeEval:
             return openai_batch_responses, batch
         else:
             bt.logging.info(
-                f"Error in openai batch processing with status:: {batch.status}\n Error: {batch.errors.to_json()}"
+                f"Error in openai batch processing with status:: {batch.status}\n Error: {batch.errors.to_json() if batch.errors else 'Unknown error'}"
             )
-            return None
+            return None, None

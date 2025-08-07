@@ -50,7 +50,7 @@ async def forward(self: validator.Validator):
     # Define how the validator selects a miner to query, how often, etc.
     # get_random_uids is an example method, but you can replace it with your own.
     try:
-        miner_uids = [10, 11]
+        miner_uids = get_available_uids()
         # The dendrite client queries the network.
         prompt_for_vali = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>  
     You are a compassionate mental health assistant.  
@@ -105,8 +105,7 @@ async def forward(self: validator.Validator):
                 base_response=base_response,
             )
             miner_responses = []
-
-            for resp, miner_uid in zip(responses, miner_uids):
+            for resp, miner_uid in zip(responses, miner_uids.tolist()):
 
                 miner_responses.append(
                     MinerResponse(
@@ -121,12 +120,12 @@ async def forward(self: validator.Validator):
         ready_requests = get_ready_requests()
         if ready_requests:
             processed_request_ids = []
-            judged_responses = []
             miner_scores = {}
             bt.logging.info(
                 f"Found {len(ready_requests)} requests ready for processing."
             )
             for req in ready_requests:
+                judged_responses = []
                 miner_db_response = {
                     item.miner_id: {
                         "response_text": item.response_text,
@@ -134,6 +133,7 @@ async def forward(self: validator.Validator):
                     }
                     for item in req.responses
                 }
+
                 bt.logging.info(
                     f"Processing batch request {req.openai_batch_id} created at {req.created_at} with prompt: {req.prompt}"
                 )
@@ -141,6 +141,7 @@ async def forward(self: validator.Validator):
                     batch_id=req.openai_batch_id
                 )
                 if openai_batch:
+                    processed_request_ids.append(req.id)
                     for eval in openai_batch:
                         parsed_eval = json.loads(eval.strip())
                         custom_id = parsed_eval.get("custom_id", "")
@@ -150,11 +151,15 @@ async def forward(self: validator.Validator):
                             == 200
                         ):
                             parsed_miners = batch_info.metadata[custom_id].split(",")
-                            miner_evaluation = parsed_eval.response.body.choices[
-                                0
-                            ].message.content
+                            miner_evaluation = (
+                                parsed_eval.get("response", "")
+                                .get("body")
+                                .get("choices")[0]
+                                .get("message")
+                                .get("content")
+                            )
                         try:
-                            result = json.loads(miner_evaluation)
+                            result = json.loads(miner_evaluation.strip())
                             scores = result.get(
                                 "scores",
                                 [0.0] * len(parsed_miners),
@@ -169,22 +174,27 @@ async def forward(self: validator.Validator):
                                     total_score = 0.0
                                 elif bounded_score > 0.2:
                                     response_time_score = 0
+                                    if miner_db_response.get(miner_uid) is None:
+                                        bt.logging.warning(
+                                            f"No response found for miner {miner_uid} in request {req.name}"
+                                        )
+                                        continue
                                     if (
-                                        miner_db_response.get(miner_uid, None).get(
+                                        miner_db_response.get(miner_uid).get(
                                             "response_time", 500
                                         )
                                         < 10
                                     ):
                                         response_time_score = 100
                                     elif (
-                                        miner_db_response.get(miner_uid, None).get(
+                                        miner_db_response.get(miner_uid).get(
                                             "response_time", 500
                                         )
                                         < 20
                                     ):
                                         response_time_score = 50
                                     elif (
-                                        miner_db_response.get(miner_uid, None).get(
+                                        miner_db_response.get(miner_uid).get(
                                             "response_time", 500
                                         )
                                         < 30
@@ -196,15 +206,15 @@ async def forward(self: validator.Validator):
                                     )
                                 judged_responses.append(
                                     {
-                                        "request_id": req.get("name", ""),
+                                        "request_id": req.name,
                                         "miner_id": miner_uid,
                                         "hotkey": self.metagraph.hotkeys[miner_uid],
                                         "coldkey": self.metagraph.coldkeys[miner_uid],
-                                        "prompt": prompt,
+                                        "prompt": req.prompt,
                                         "response": miner_db_response[miner_uid].get(
                                             "response_text", ""
                                         ),
-                                        "base_response": req.get("base_response", ""),
+                                        "base_response": req.base_response,
                                         "response_time": miner_db_response[
                                             miner_uid
                                         ].get("response_time", 500),
@@ -217,23 +227,30 @@ async def forward(self: validator.Validator):
                                 miner_scores[miner_uid] = (
                                     miner_scores.get(miner_uid, 0.0) + total_score
                                 )
-                                processed_request_ids.append(req.id)
-
                         except Exception as e:
                             bt.logging.error(
                                 f"Error parsing judge JSON: {e}, content: {parsed_eval}"
                             )
+                            bt.logging.error(traceback.format_exc())
+                if judged_responses:
+                    self.wandb_logger.log_evaluation_round(
+                        prompt, req.name, judged_responses
+                    )
+                    self.wandb_logger.create_summary_dashboard()
+                else:
+                    bt.logging.warning(f"No responses received for request {req.name}")
 
-                # Here you can add logic to process each request as needed.
-
-        if judged_responses:
-            self.wandb_logger.log_evaluation_round(prompt, request_id, judged_responses)
-            self.wandb_logger.create_summary_dashboard()
-        else:
-            bt.logging.warning(f"No responses received for request {request_id}")
-        if miner_scores:
-            self.update_scores(np.array(miner_scores.keys()), miner_scores.values())
-            delete_requests(request_ids=processed_request_ids)
+            if miner_scores:
+                rewarded_miner_ids = list(miner_scores.keys())
+                reward_scores = np.array(list(miner_scores.values()))
+                self.update_scores(reward_scores, rewarded_miner_ids)
+                bt.logging.info(
+                    f"Updated scores for miners: keys: {rewarded_miner_ids}, values: {reward_scores.tolist()}"
+                )
+                delete_requests(request_ids=processed_request_ids)
+                bt.logging.info(
+                    f"Deleted processed requests with IDs: {processed_request_ids}"
+                )
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
         bt.logging.error(traceback.format_exc())

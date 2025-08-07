@@ -30,7 +30,7 @@ class SubnetEvaluationLogger:
         try:
             if resume_run_id:
                 self.run = wandb.init(
-                    project=f"bittensor-bettertherapy-subnet-{self.network}-{self.subnet_id}",
+                    project=f"bittensor-bettertherapy-test-subnet-{self.network}-{self.subnet_id}",
                     id=resume_run_id,
                     resume="allow",
                     tags=[

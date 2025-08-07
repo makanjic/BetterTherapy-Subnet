@@ -166,5 +166,6 @@ testing/
 .vscode/settings.json
 
 *.db
+*.jsonl
 
 wandb/
