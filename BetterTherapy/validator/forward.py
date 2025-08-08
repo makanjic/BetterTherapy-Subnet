@@ -168,12 +168,12 @@ async def forward(self: validator.Validator):
                                 scores,
                                 parsed_miners,
                             ):
+                                response_time_score = 0
                                 miner_uid = int(miner_uid)
                                 bounded_score = max(0.0, min(1.0, float(score)))
                                 if bounded_score == 0.0:
                                     total_score = 0.0
                                 elif bounded_score > 0.2:
-                                    response_time_score = 0
                                     if miner_db_response.get(miner_uid) is None:
                                         bt.logging.warning(
                                             f"No response found for miner {miner_uid} in request {req.name}"
