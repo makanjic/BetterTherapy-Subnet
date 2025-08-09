@@ -118,7 +118,9 @@ async def forward(self: validator.Validator):
             add_bulk_responses(responses=miner_responses)
 
         ready_requests = get_ready_requests()
+        elapsed_time_since_start = time.time() - self.start_time
         if ready_requests:
+            self.ready_to_set_weights = True
             processed_request_ids = []
             miner_scores = {}
             bt.logging.info(
@@ -251,6 +253,16 @@ async def forward(self: validator.Validator):
                 bt.logging.info(
                     f"Deleted processed requests with IDs: {processed_request_ids}"
                 )
+        elif elapsed_time_since_start < 24 * 60 * 60:
+            bt.logging.info(
+                f"No requests ready for processing yet and less than 24 hours since start, so copying weights from vali {self.config.copy_validator.uid}."
+            )
+            self.ready_to_set_weights = False
+            bt.logging.info(
+                f"No requests ready for processing. Waiting for more requests to be added."
+            )
+            self.copy_weights()
+
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
         bt.logging.error(traceback.format_exc())

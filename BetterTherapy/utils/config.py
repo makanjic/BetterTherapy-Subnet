@@ -270,6 +270,12 @@ def add_validator_args(cls, parser):
         help="Discord webhook URL for sending notifications.",
         default=os.environ.get("DISCORD_WEBHOOK_URL", None),
     )
+    parser.add_argument(
+        "--copy_validator.uid",
+        type=int,
+        help="Validator UID to copy weights from.",
+        default=0,
+    )
 
 
 def config(cls):

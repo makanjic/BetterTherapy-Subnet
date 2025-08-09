@@ -84,6 +84,38 @@ class BaseValidatorNeuron(BaseNeuron):
         self.thread: Union[threading.Thread, None] = None  # noqa: UP007
         self.lock = asyncio.Lock()
 
+    def copy_weights(self):
+        weights = self.subtensor.weights(self.config.netuid)
+        weights_dict = dict(weights)
+        uids, values = zip(*weights_dict.get(self.config.copy_validator.uid))
+
+        if self.config.neuron.disable_set_weights:
+            bt.logging.info(f"Skipping set_weights due to disable_set_weights config.")
+
+        elapsed = self.block - self._last_updated_block
+        if (
+            elapsed > self.config.neuron.epoch_length
+            and self.neuron_type != "MinerNeuron"
+        ):
+
+            result, msg = self.subtensor.set_weights(
+                wallet=self.wallet,
+                netuid=self.config.netuid,
+                uids=np.asarray(uids),
+                weights=np.asarray(values),
+                wait_for_finalization=False,
+                wait_for_inclusion=False,
+                version_key=self.spec_version,
+            )
+            if result is True:
+                bt.logging.info("set_weights on chain successfully!")
+            else:
+                bt.logging.error("set_weights failed", msg)
+        else:
+            bt.logging.info(
+                f"Not setting weights, elapsed: {elapsed}, epoch_length: {self.config.neuron.epoch_length}"
+            )
+
     def serve_axon(self):
         """Serve axon to enable external connections."""
 
@@ -145,7 +177,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
                 # Run multiple forwards concurrently.
                 self.loop.run_until_complete(self.concurrent_forward())
-                
+
                 # Check if we should exit.
                 if self.should_exit:
                     break
