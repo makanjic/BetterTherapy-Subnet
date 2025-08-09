@@ -14,7 +14,9 @@ logger = logging.getLogger("autoupdater")
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Auto-update BetterTherapy-Subnet repository")
+    parser = argparse.ArgumentParser(
+        description="Auto-update BetterTherapy-Subnet repository"
+    )
     parser.add_argument(
         "--repo-path",
         type=str,
@@ -24,7 +26,7 @@ def parse_arguments():
     parser.add_argument(
         "--branch", type=str, default="main", help="Branch to pull from (default: main)"
     )
-    
+
     parser.add_argument(
         "--restart-command",
         type=str,
@@ -134,6 +136,16 @@ def restart_application(restart_command, repo_path):
     return False
 
 
+def run_migrations(repo_path):
+    logger.info("Running database migrations")
+    alembic_cmd = "uv run alembic upgrade head"
+    if run_command(alembic_cmd, cwd=repo_path) is not None:
+        logger.info("Database migrations completed successfully")
+        return True
+    logger.error("Failed to run database migrations")
+    return False
+
+
 def main():
     args = parse_arguments()
 
@@ -167,6 +179,10 @@ def main():
         # Update dependencies
         if not update_dependencies(args.repo_path):
             logger.error("Failed to update dependencies")
+            return 1
+
+        if not run_migrations(args.repo_path):
+            logger.error("Failed to run database migrations")
             return 1
         # Restart application if needed
         if not restart_application(args.restart_command, args.repo_path):

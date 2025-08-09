@@ -79,6 +79,12 @@ uv sync
 uv pip install -e .
 ```
 
+### 3. Run Migrations
+
+```bash
+uv run alembic upgrade head
+```
+
 ---
 
 ## Running the Subnet

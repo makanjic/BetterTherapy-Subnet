@@ -18,7 +18,7 @@ def generate_response(prompt: str, model, tokenizer, type="validator") -> str:
             input_ids=input_ids,
             attention_mask=attention_mask,
             max_new_tokens=1000,
-            temperature=0.2,
+            temperature=1.5,
             pad_token_id=tokenizer.eos_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )

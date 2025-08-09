@@ -1,8 +1,8 @@
 import json
 
+import aiohttp
 import bittensor as bt
 from openai import OpenAI
-import aiohttp
 
 
 class OpenAILLMAsJudgeEval:

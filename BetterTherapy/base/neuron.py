@@ -26,6 +26,7 @@ from BetterTherapy.mock import MockMetagraph, MockSubtensor
 # Sync calls set weights and also resyncs the metagraph.
 from BetterTherapy.utils.config import add_args, check_config, config
 from BetterTherapy.utils.misc import ttl_get_block
+import time
 
 
 class BaseNeuron(ABC):
@@ -63,6 +64,8 @@ class BaseNeuron(ABC):
         self.config = self.config()
         self.config.merge(base_config)
         self.check_config(self.config)
+        self.start_time = time.time()
+        self.ready_to_set_weights = False
 
         # Set up logging with the provided configuration.
         bt.logging.set_config(config=self.config.logging)
@@ -155,6 +158,15 @@ class BaseNeuron(ABC):
 
         # Check if enough epoch blocks have elapsed since the last epoch.
         if self.config.neuron.disable_set_weights:
+            return False
+
+        if not self.ready_to_set_weights:
+            elapsed_time = time.time() - self.start_time
+            remaining_block = (24 * 60 * 60 - elapsed_time) // 12
+            ready_block = self.block + remaining_block
+            bt.logging.info(
+                f"not ready to set weights at block {self.block}. will be read at block:: {ready_block}"
+            )
             return False
 
         elapsed = self.block - self._last_updated_block
