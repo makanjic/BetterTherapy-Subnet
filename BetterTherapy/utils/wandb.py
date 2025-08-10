@@ -114,11 +114,28 @@ class SubnetEvaluationLogger:
     def log_evaluation_round(
         self, prompt: str, request_id: str, miner_responses: list[dict[str, Any]]
     ):
-        """Log evaluation round with improved UX"""
+        """Log evaluation round with improved UX and robust metric handling"""
 
         if not self.run:
             bt.logging.warning("Wandb not initialized, skipping logging")
             return
+
+        def _num(x):
+            try:
+                return float(x)
+            except (TypeError, ValueError):
+                return None
+
+        def _ensure_perf(uid):
+            if uid not in self.miner_performance:
+                self.miner_performance[uid] = {
+                    "scores": [],
+                    "response_times": [],
+                    "quality_scores": [],
+                    "timestamps": [],
+                    "successful_responses": 0,
+                    "hotkey": None,
+                }
 
         timestamp = datetime.now()
         self.evaluation_count += 1
@@ -135,52 +152,70 @@ class SubnetEvaluationLogger:
             "miner_uids": [],
         }
 
+        self.request_data.setdefault(request_id, [])
+
         for response in miner_responses:
-            miner_uid = response["miner_id"]
+            miner_uid = response.get("miner_id")
+            if miner_uid is None:
+                bt.logging.warning(f"Missing miner_id in response: {response}")
+                continue
+
             self.unique_miners.add(miner_uid)
+            _ensure_perf(miner_uid)
+
+            total_score = _num(response.get("total_score"))
+            quality_score = _num(response.get("quality_score"))
+            response_time = _num(response.get("response_time"))
+            response_time_score = _num(response.get("response_time_score"))
+            hotkey = response.get("hotkey")
 
             self.request_data[request_id].append(
                 {
                     "miner_uid": miner_uid,
-                    "total_score": response["total_score"],
-                    "quality_score": response["quality_score"],
-                    "response_time": response["response_time"],
-                    "response_time_score": response["response_time_score"],
+                    "total_score": total_score,
+                    "quality_score": quality_score,
+                    "response_time": response_time,
+                    "response_time_score": response_time_score,
                     "timestamp": timestamp,
                 }
             )
 
-            self.miner_performance[miner_uid]["scores"].append(response["total_score"])
-            self.miner_performance[miner_uid]["response_times"].append(
-                response["response_time"]
-            )
-            self.miner_performance[miner_uid]["quality_scores"].append(
-                response["quality_score"]
-            )
-            self.miner_performance[miner_uid]["timestamps"].append(timestamp)
-            self.miner_performance[miner_uid]["successful_responses"] += (
-                1 if response["total_score"] > 0 else 0
-            )
-            self.miner_performance[miner_uid]["hotkey"] = response["hotkey"]
+            if total_score is not None:
+                self.miner_performance[miner_uid]["scores"].append(total_score)
+            if response_time is not None:
+                self.miner_performance[miner_uid]["response_times"].append(
+                    response_time
+                )
+            if quality_score is not None:
+                self.miner_performance[miner_uid]["quality_scores"].append(
+                    quality_score
+                )
 
-            request_metrics["scores"].append(response["total_score"])
-            request_metrics["response_times"].append(response["response_time"])
-            request_metrics["quality_scores"].append(response["quality_score"])
+            self.miner_performance[miner_uid]["timestamps"].append(timestamp)
+            if (total_score is not None) and (total_score > 0):
+                self.miner_performance[miner_uid]["successful_responses"] += 1
+            self.miner_performance[miner_uid]["hotkey"] = hotkey
+
+            if total_score is not None:
+                request_metrics["scores"].append(total_score)
+            if response_time is not None:
+                request_metrics["response_times"].append(response_time)
+            if quality_score is not None:
+                request_metrics["quality_scores"].append(quality_score)
             request_metrics["miner_uids"].append(miner_uid)
 
             self.successful_responses += 1
 
         bt.logging.info(f"Request metrics: {request_metrics}")
         self.run.log({"request_data": self.request_data})
+
         try:
             self._create_request_visualizations(request_id, request_metrics, prompt)
         except Exception as e:
             bt.logging.error(f"Failed to create request visualizations: {e}")
 
         self._update_live_metrics(request_id, request_metrics)
-
         self._update_leaderboard()
-
         self._log_request_comparison(request_id, timestamp, prompt, request_metrics)
 
         if self.evaluation_count % 5 == 0:
