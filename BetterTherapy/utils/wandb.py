@@ -298,9 +298,8 @@ Avg Quality: {np.mean(metrics["quality_scores"]):.2f}"""
         """Update live metrics for real-time monitoring"""
 
         avg_score = np.mean(metrics["scores"]) if metrics["scores"] else 0
-        avg_response_time = (
-            np.mean(metrics["response_times"]) if metrics["response_times"] else 0
-        )
+        valid_times = [t for t in metrics["response_times"] if t is not None]
+        avg_response_time = np.mean(valid_times) if valid_times else 0
         avg_quality = (
             np.mean(metrics["quality_scores"]) if metrics["quality_scores"] else 0
         )
