@@ -631,167 +631,173 @@ Avg Quality: {np.mean(metrics["quality_scores"]):.2f}"""
 
         if not self.run:
             return
-
-        # First check if we have enough data to create a meaningful dashboard
-        all_response_times = []
-        all_scores = []
-        for perf in self.miner_performance.values():
-            all_response_times.extend(perf["response_times"])
-            all_scores.extend(perf["scores"])
-
-        # If we don't have enough data, skip creating the dashboard
-        if not all_scores or not all_response_times:
-            bt.logging.warning("Not enough data to create summary dashboard. Skipping.")
-            return
-
-        # Create a comprehensive summary figure
-        fig = plt.figure(figsize=(20, 12))
-
-        # Define grid
-        gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
-
-        # 1. Top performers pie chart
-        ax1 = fig.add_subplot(gs[0, 0])
-        top_miners = sorted(
-            self.miner_performance.items(),
-            key=lambda x: np.mean(x[1]["scores"]) if x[1]["scores"] else 0,
-            reverse=True,
-        )[:5]
-
-        if top_miners and any(np.mean(m[1]["scores"]) > 0 for m in top_miners):
-            labels = [f"UID {m[0]}" for m in top_miners]
-            sizes = [np.mean(m[1]["scores"]) for m in top_miners]
-            ax1.pie(sizes, labels=labels, autopct="%1.1f%%")
-            ax1.set_title("Top 5 Miners by Avg Score")
-        else:
-            ax1.text(
-                0.5,
-                0.5,
-                "No miner performance data yet",
-                horizontalalignment="center",
-                verticalalignment="center",
-            )
-            ax1.set_title("Top 5 Miners by Avg Score")
-
-        # 2. Response time distribution
-        ax2 = fig.add_subplot(gs[0, 1])
-        if all_response_times:
-            ax2.hist(
-                all_response_times,
-                bins=min(20, len(set(all_response_times))),
-                alpha=0.7,
-                color="blue",
-            )
-            ax2.set_xlabel("Response Time (s)")
-            ax2.set_ylabel("Frequency")
-            ax2.set_title("Response Time Distribution")
-        else:
-            ax2.text(
-                0.5,
-                0.5,
-                "No response time data yet",
-                horizontalalignment="center",
-                verticalalignment="center",
-            )
-            ax2.set_title("Response Time Distribution")
-
-        # 3. Score distribution
-        ax3 = fig.add_subplot(gs[0, 2])
-        if all_scores:
-            ax3.hist(
-                all_scores, bins=min(20, len(set(all_scores))), alpha=0.7, color="green"
-            )
-            ax3.set_xlabel("Total Score")
-            ax3.set_ylabel("Frequency")
-            ax3.set_title("Score Distribution")
-        else:
-            ax3.text(
-                0.5,
-                0.5,
-                "No score data yet",
-                horizontalalignment="center",
-                verticalalignment="center",
-            )
-            ax3.set_title("Score Distribution")
-
-        # 4. Evaluation timeline
-        ax4 = fig.add_subplot(gs[1, :])
-        eval_times = []
-        eval_counts = []
-
-        for i, (req_id, responses) in enumerate(self.request_data.items()):
-            if responses:
-                eval_times.append(i)
-                eval_counts.append(len(responses))
-
-        if eval_times:
-            ax4.bar(eval_times, eval_counts, alpha=0.7)
-            ax4.set_xlabel("Request Number")
-            ax4.set_ylabel("Number of Responses")
-            ax4.set_title("Responses per Request Over Time")
-        else:
-            ax4.text(
-                0.5,
-                0.5,
-                "No evaluation timeline data yet",
-                horizontalalignment="center",
-                verticalalignment="center",
-            )
-            ax4.set_title("Responses per Request Over Time")
-
-        # 5. Summary statistics (without emojis)
-        ax5 = fig.add_subplot(gs[2, :])
-        ax5.axis("off")
-
-        success_rate = 0
-        if (self.successful_responses + self.failed_responses) > 0:
-            success_rate = (
-                self.successful_responses
-                / (self.successful_responses + self.failed_responses)
-                * 100
-            )
-
-        mean_score = 0
-        std_score = 0
-        if all_scores:
-            mean_score = np.mean(all_scores)
-            std_score = np.std(all_scores)
-
-        mean_response_time = 0
-        if all_response_times:
-            mean_response_time = np.mean(all_response_times)
-
-        summary_text = f"""Validator Summary Dashboard
-
-    Total Evaluations: {self.evaluation_count}
-    Unique Requests: {len(self.unique_requests)}
-    Unique Miners: {len(self.unique_miners)}
-
-    Success Rate: {success_rate:.1f}%
-    Total Successful Responses: {self.successful_responses}
-    Total Failed Responses: {self.failed_responses}
-
-    Average Score Across All: {mean_score:.2f} (std={std_score:.2f})
-    Average Response Time: {mean_response_time:.2f}s
-
-    Last Update: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"""
-
-        ax5.text(
-            0.5,
-            0.5,
-            summary_text,
-            transform=ax5.transAxes,
-            fontsize=14,
-            ha="center",
-            va="center",
-            bbox=dict(boxstyle="round", facecolor="lightblue", alpha=0.5),
-        )
-
-        plt.suptitle(f"Validator {self.validator_uid} - Summary Dashboard", fontsize=20)
-
-        # Add a check before saving to ensure we have valid plots
-        temp_path = "/tmp/summary_dashboard.png"
         try:
+            # First check if we have enough data to create a meaningful dashboard
+            all_response_times = []
+            all_scores = []
+            for perf in self.miner_performance.values():
+                all_response_times.extend(perf["response_times"])
+                all_scores.extend(perf["scores"])
+
+            # If we don't have enough data, skip creating the dashboard
+            if not all_scores or not all_response_times:
+                bt.logging.warning(
+                    "Not enough data to create summary dashboard. Skipping."
+                )
+                return
+
+            # Create a comprehensive summary figure
+            fig = plt.figure(figsize=(20, 12))
+
+            # Define grid
+            gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
+
+            # 1. Top performers pie chart
+            ax1 = fig.add_subplot(gs[0, 0])
+            top_miners = sorted(
+                self.miner_performance.items(),
+                key=lambda x: np.mean(x[1]["scores"]) if x[1]["scores"] else 0,
+                reverse=True,
+            )[:5]
+
+            if top_miners and any(np.mean(m[1]["scores"]) > 0 for m in top_miners):
+                labels = [f"UID {m[0]}" for m in top_miners]
+                sizes = [np.mean(m[1]["scores"]) for m in top_miners]
+                ax1.pie(sizes, labels=labels, autopct="%1.1f%%")
+                ax1.set_title("Top 5 Miners by Avg Score")
+            else:
+                ax1.text(
+                    0.5,
+                    0.5,
+                    "No miner performance data yet",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                )
+                ax1.set_title("Top 5 Miners by Avg Score")
+
+            # 2. Response time distribution
+            ax2 = fig.add_subplot(gs[0, 1])
+            if all_response_times:
+                ax2.hist(
+                    all_response_times,
+                    bins=min(20, len(set(all_response_times))),
+                    alpha=0.7,
+                    color="blue",
+                )
+                ax2.set_xlabel("Response Time (s)")
+                ax2.set_ylabel("Frequency")
+                ax2.set_title("Response Time Distribution")
+            else:
+                ax2.text(
+                    0.5,
+                    0.5,
+                    "No response time data yet",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                )
+                ax2.set_title("Response Time Distribution")
+
+            # 3. Score distribution
+            ax3 = fig.add_subplot(gs[0, 2])
+            if all_scores:
+                ax3.hist(
+                    all_scores,
+                    bins=min(20, len(set(all_scores))),
+                    alpha=0.7,
+                    color="green",
+                )
+                ax3.set_xlabel("Total Score")
+                ax3.set_ylabel("Frequency")
+                ax3.set_title("Score Distribution")
+            else:
+                ax3.text(
+                    0.5,
+                    0.5,
+                    "No score data yet",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                )
+                ax3.set_title("Score Distribution")
+
+            # 4. Evaluation timeline
+            ax4 = fig.add_subplot(gs[1, :])
+            eval_times = []
+            eval_counts = []
+
+            for i, (req_id, responses) in enumerate(self.request_data.items()):
+                if responses:
+                    eval_times.append(i)
+                    eval_counts.append(len(responses))
+
+            if eval_times:
+                ax4.bar(eval_times, eval_counts, alpha=0.7)
+                ax4.set_xlabel("Request Number")
+                ax4.set_ylabel("Number of Responses")
+                ax4.set_title("Responses per Request Over Time")
+            else:
+                ax4.text(
+                    0.5,
+                    0.5,
+                    "No evaluation timeline data yet",
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                )
+                ax4.set_title("Responses per Request Over Time")
+
+            # 5. Summary statistics (without emojis)
+            ax5 = fig.add_subplot(gs[2, :])
+            ax5.axis("off")
+
+            success_rate = 0
+            if (self.successful_responses + self.failed_responses) > 0:
+                success_rate = (
+                    self.successful_responses
+                    / (self.successful_responses + self.failed_responses)
+                    * 100
+                )
+
+            mean_score = 0
+            std_score = 0
+            if all_scores:
+                mean_score = np.mean(all_scores)
+                std_score = np.std(all_scores)
+
+            mean_response_time = 0
+            if all_response_times:
+                mean_response_time = np.mean(all_response_times)
+
+            summary_text = f"""Validator Summary Dashboard
+
+        Total Evaluations: {self.evaluation_count}
+        Unique Requests: {len(self.unique_requests)}
+        Unique Miners: {len(self.unique_miners)}
+
+        Success Rate: {success_rate:.1f}%
+        Total Successful Responses: {self.successful_responses}
+        Total Failed Responses: {self.failed_responses}
+
+        Average Score Across All: {mean_score:.2f} (std={std_score:.2f})
+        Average Response Time: {mean_response_time:.2f}s
+
+        Last Update: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"""
+
+            ax5.text(
+                0.5,
+                0.5,
+                summary_text,
+                transform=ax5.transAxes,
+                fontsize=14,
+                ha="center",
+                va="center",
+                bbox=dict(boxstyle="round", facecolor="lightblue", alpha=0.5),
+            )
+
+            plt.suptitle(
+                f"Validator {self.validator_uid} - Summary Dashboard", fontsize=20
+            )
+
+            # Add a check before saving to ensure we have valid plots
+            temp_path = "/tmp/summary_dashboard.png"
             fig.savefig(temp_path, dpi=150, bbox_inches="tight")
             self.run.log({"summary/dashboard": wandb.Image(temp_path)})
 
@@ -799,10 +805,9 @@ Avg Quality: {np.mean(metrics["quality_scores"]):.2f}"""
                 os.remove(temp_path)
             except Exception as _e:
                 bt.logging.warning(f"Failed to remove temp file: {temp_path}")
-        except Exception as save_error:
-            bt.logging.error(f"Failed to save dashboard: {save_error}")
+        except Exception as e:
+            bt.logging.error(f"Failed to create summary dashboard: {e}")
             # Create a simple text-only figure as fallback
-            plt.close(fig)
             fig = plt.figure(figsize=(10, 6))
             plt.axis("off")
             plt.text(
@@ -813,9 +818,9 @@ Avg Quality: {np.mean(metrics["quality_scores"]):.2f}"""
                 va="center",
                 fontsize=14,
             )
-            plt.savefig(temp_path)
+            temp_path = "/tmp/summary_dashboard_error.png"
+            fig.savefig(temp_path)
             self.run.log({"summary/dashboard": wandb.Image(temp_path)})
-        finally:
             plt.close(fig)
 
     def _save_run_id(self):
