@@ -160,6 +160,15 @@ class BaseNeuron(ABC):
         if self.config.neuron.disable_set_weights:
             return False
 
+        elapsed = self.block - self._last_updated_block
+
+        # Only set weights if epoch has passed and this isn't a MinerNeuron.
+        if (
+            elapsed < self.config.neuron.epoch_length
+            or self.neuron_type == "MinerNeuron"
+        ):
+            return False
+
         if not self.ready_to_set_weights:
             elapsed_time = time.time() - self.start_time
             remaining_block = (24 * 60 * 60 - elapsed_time) // 12
@@ -169,13 +178,7 @@ class BaseNeuron(ABC):
             )
             return False
 
-        elapsed = self.block - self._last_updated_block
-
-        # Only set weights if epoch has passed and this isn't a MinerNeuron.
-        return (
-            elapsed > self.config.neuron.epoch_length
-            and self.neuron_type != "MinerNeuron"
-        )  # don't set weights if you're a miner
+        return True
 
     def save_state(self):
         bt.logging.trace(
