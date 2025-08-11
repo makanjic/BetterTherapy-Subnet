@@ -56,7 +56,7 @@ class OpenAIBatchLLMAsJudgeEval:
         current_batch_responses = []
         current_batch_miner_uids = []
         current_word_count = 0
-        max_words_per_batch = 5500
+        max_words_per_batch = 4500
         batch_metadata = {}
         request_number = 1
         for i, (response, miner_uid) in enumerate(zip(responses, miner_uids)):
