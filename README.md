@@ -107,7 +107,7 @@ btcli wallet new_hotkey --wallet.name validator --wallet.hotkey default
 
 ### Overview
 
-This document outlines the hardware requirements for running Meta's Llama 3.1 8B model locally.
+This document outlines the hardware requirements for running Meta's Llama 3.1 8B Instruct model locally.
 
 ### Minimum Requirements
 
@@ -278,7 +278,7 @@ uv run neurons/validator.py \
   --subtensor.chain_endpoint <endpoint> \
   --wallet.name validator \
   --wallet.hotkey default \
-  --logging.debug --model.name meta-llama/Llama-3.1-8B
+  --logging.debug --model.name meta-llama/Llama-3.1-8B-Instruct
 ```
 
 ### Running with PM2 (Process Manager)
@@ -291,7 +291,7 @@ pm2 start uv --name bt-test-vali \
   --netuid <your_netuid> \
   --subtensor.chain_endpoint <endpoint> \
   --wallet.name bt-test-vali --wallet.hotkey default \
-  --logging.debug --axon.port 8091 --model.name meta-llama/Llama-3.1-8B
+  --logging.debug --axon.port 8091 --model.name meta-llama/Llama-3.1-8B-Instruct
 ```
 
 PM2 commands for process management:

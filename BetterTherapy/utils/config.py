@@ -261,7 +261,7 @@ def add_validator_args(cls, parser):
         "--model.name",
         type=str,
         help="The base model you are running",
-        default="meta-llama/Llama-3.1-8B",
+        default="meta-llama/Llama-3.1-8B-Instruct",
     )
 
     parser.add_argument(
