@@ -60,7 +60,9 @@ class OpenAIBatchLLMAsJudgeEval:
         batch_metadata = {}
         request_number = 1
         for i, (response, miner_uid) in enumerate(zip(responses, miner_uids)):
-            response_word_count = count_words(response.output) if response.output else 0
+            if not response.output:
+                continue
+            response_word_count = count_words(response.output)
             if (current_word_count + response_word_count > max_words_per_batch) or (
                 current_word_count and i == min(len(responses) - 1, len(miner_uids) - 1)
             ):
