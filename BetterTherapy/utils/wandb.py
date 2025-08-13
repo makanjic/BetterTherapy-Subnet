@@ -228,13 +228,35 @@ class SubnetEvaluationLogger:
     def _create_request_visualizations(
         self, request_id: str, metrics: dict, prompt: str
     ):
-        """Create visualizations for a specific request showing all miners"""
+        """Create visualizations for a specific request showing all miners (robust)"""
+        import math
 
-        if not metrics["miner_uids"]:
+        uids = list(metrics.get("miner_uids", []))
+        sc = list(metrics.get("scores", []))
+        rt = list(metrics.get("response_times", []))
+        qs = list(metrics.get("quality_scores", []))
+
+        rows = []
+        max_len = min(len(uids), len(sc), len(rt), len(qs))
+        for i in range(max_len):
+            uid, s, t, q = uids[i], sc[i], rt[i], qs[i]
+
+            def bad(x):
+                return x is None or (isinstance(x, float) and math.isnan(x))
+
+            if not (bad(s) or bad(t) or bad(q)):
+                rows.append((uid, float(s), float(t), float(q)))
+
+        if not rows:
             return
 
-        fig = plt.figure(figsize=(15, 10))
+        rows.sort(key=lambda r: r[1], reverse=True)
+        sorted_uids = [r[0] for r in rows]
+        sorted_scores = [r[1] for r in rows]
+        sorted_response_times = [r[2] for r in rows]
+        sorted_quality_scores = [r[3] for r in rows]
 
+        fig = plt.figure(figsize=(15, 10))
         gs = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.3)
         ax1 = fig.add_subplot(gs[0, 0])
         ax2 = fig.add_subplot(gs[0, 1])
@@ -243,71 +265,59 @@ class SubnetEvaluationLogger:
 
         fig.suptitle(f"Request {request_id} - All Miners Comparison", fontsize=16)
 
-        sorted_indices = np.argsort(metrics["scores"])[::-1]
-        sorted_uids = [metrics["miner_uids"][i] for i in sorted_indices]
-        sorted_scores = [metrics["scores"][i] for i in sorted_indices]
-        sorted_response_times = [metrics["response_times"][i] for i in sorted_indices]
-        sorted_quality_scores = [metrics["quality_scores"][i] for i in sorted_indices]
-
-        bars1 = ax1.bar(range(len(sorted_uids)), sorted_scores)
+        # Bars
+        bars1 = ax1.bar(range(len(rows)), sorted_scores)
         ax1.set_xlabel("Miner UID")
         ax1.set_ylabel("Total Score")
         ax1.set_title("Total Scores by Miner")
-        ax1.set_xticks(range(len(sorted_uids)))
+        ax1.set_xticks(range(len(rows)))
         ax1.set_xticklabels([f"UID {uid}" for uid in sorted_uids], rotation=45)
 
-        colors = [
-            "green" if s > np.mean(sorted_scores) else "orange" for s in sorted_scores
-        ]
-        for bar, color in zip(bars1, colors, strict=False):
-            bar.set_color(color)
+        # Color bars by above/below mean (guard len==1)
+        mean_score = sum(sorted_scores) / len(sorted_scores)
+        for bar, s in zip(bars1, sorted_scores):
+            bar.set_color("green" if s > mean_score else "orange")
 
-        bars2 = ax2.bar(range(len(sorted_uids)), sorted_response_times)
+        bars2 = ax2.bar(range(len(rows)), sorted_response_times)
         ax2.set_xlabel("Miner UID")
         ax2.set_ylabel("Response Time (s)")
         ax2.set_title("Response Times by Miner")
-        ax2.set_xticks(range(len(sorted_uids)))
+        ax2.set_xticks(range(len(rows)))
         ax2.set_xticklabels([f"UID {uid}" for uid in sorted_uids], rotation=45)
 
-        rt_colors = [
-            "green" if rt < 5 else "orange" if rt < 15 else "red"
-            for rt in sorted_response_times
-        ]
-        for bar, color in zip(bars2, rt_colors, strict=False):
-            bar.set_color(color)
+        for bar, rt in zip(bars2, sorted_response_times):
+            bar.set_color("green" if rt < 5 else ("orange" if rt < 15 else "red"))
 
-        bars3 = ax3.bar(range(len(sorted_uids)), sorted_quality_scores)
+        bars3 = ax3.bar(range(len(rows)), sorted_quality_scores)
         ax3.set_xlabel("Miner UID")
         ax3.set_ylabel("Quality Score")
         ax3.set_title("Quality Scores by Miner")
-        ax3.set_xticks(range(len(sorted_uids)))
+        ax3.set_xticks(range(len(rows)))
         ax3.set_xticklabels([f"UID {uid}" for uid in sorted_uids], rotation=45)
 
+        # Summary
         ax4.axis("off")
-
-        stats_text = f"""Request Summary:
-        
-Prompt: {prompt[:50]}...
-Total Miners: {len(metrics["miner_uids"])}
-
-Best Score: {max(metrics["scores"]):.2f} (UID {sorted_uids[0]})
-Avg Score: {np.mean(metrics["scores"]):.2f}
-Worst Score: {min(metrics["scores"]):.2f}
-
-Fastest Response: {min(metrics["response_times"]):.2f}s
-Slowest Response: {max(metrics["response_times"]):.2f}s
-Avg Response Time: {np.mean(metrics["response_times"]):.2f}s
-
-Best Quality: {max(metrics["quality_scores"]):.2f}
-Avg Quality: {np.mean(metrics["quality_scores"]):.2f}"""
-
+        best_idx = 0  # safe: rows is non-empty
+        stats_text = (
+            "Request Summary:\n\n"
+            f"Prompt: { (prompt or '')[:50]}...\n"
+            f"Total Miners: {len(rows)}\n\n"
+            f"Best Score: {max(sorted_scores):.2f} (UID {sorted_uids[best_idx]})\n"
+            f"Avg Score: {sum(sorted_scores)/len(sorted_scores):.2f}\n"
+            f"Worst Score: {min(sorted_scores):!s:.2f}\n\n"
+            f"Fastest Response: {min(sorted_response_times):.2f}s\n"
+            f"Slowest Response: {max(sorted_response_times):!s:.2f}s\n"
+            f"Avg Response Time: {sum(sorted_response_times)/len(sorted_response_times):.2f}s\n\n"
+            f"Best Quality: {max(sorted_quality_scores):.2f}\n"
+            f"Avg Quality: {sum(sorted_quality_scores)/len(sorted_quality_scores):.2f}"
+        )
         ax4.text(
             0.05,
             0.95,
             stats_text,
             transform=ax4.transAxes,
             fontsize=11,
-            verticalalignment="top",
+            va="top",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
         )
 
