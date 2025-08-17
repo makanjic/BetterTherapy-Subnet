@@ -50,7 +50,8 @@ async def forward(self: validator.Validator):
     # Define how the validator selects a miner to query, how often, etc.
     # get_random_uids is an example method, but you can replace it with your own.
     try:
-        miner_uids = get_available_uids(self, 256)
+        # miner_uids = get_available_uids(self, 256)
+        miner_uids = np.array([3])
         # The dendrite client queries the network.
         prompt_for_vali = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>  
     You are a compassionate mental health assistant.  
@@ -64,9 +65,14 @@ async def forward(self: validator.Validator):
     <|start_header_id|>assistant<|end_header_id|>{ 
     """
 
-        base_query_response = generate_response(
-            prompt_for_vali, self.model, self.tokenizer
-        )
+        # base_query_response = generate_response(
+        #     prompt_for_vali, self.model, self.tokenizer
+        # )
+
+        base_query_response = {
+            "question": "I am feeling lonely and want to talk to someone. but I don't want to talk to my friends or family, what should I do?",
+            "answer": "I'm here for you. It's okay to feel lonely. I'm here to listen and support you. You can talk to me about your feelings and I will be here to listen and support you.",
+        }
 
         prompt = base_query_response.get("question", None)
         base_response = base_query_response.get("answer", None)
@@ -86,7 +92,7 @@ async def forward(self: validator.Validator):
             axons=[self.metagraph.axons[uid] for uid in miner_uids],
             synapse=InferenceSynapse(prompt=prompt, request_id=request_id),
             deserialize=True,
-            timeout=500,
+            timeout=20,
         )
         bt.logging.info(
             f"Received total responses: {len(responses)}, batching them and queueing them to openai"
@@ -106,7 +112,6 @@ async def forward(self: validator.Validator):
             )
             miner_responses = []
             for resp, miner_uid in zip(responses, miner_uids.tolist()):
-
                 miner_responses.append(
                     MinerResponse(
                         request_id=new_request.id,
@@ -236,13 +241,13 @@ async def forward(self: validator.Validator):
                                 f"Error parsing judge JSON: {e}, content: {parsed_eval}"
                             )
                             bt.logging.error(traceback.format_exc())
-                if judged_responses:
-                    self.wandb_logger.log_evaluation_round(
-                        prompt, req.name, judged_responses
-                    )
-                    self.wandb_logger.create_summary_dashboard()
-                else:
-                    bt.logging.warning(f"No responses received for request {req.name}")
+                # if judged_responses:
+                #     self.wandb_logger.log_evaluation_round(
+                #         prompt, req.name, judged_responses
+                #     )
+                #     self.wandb_logger.create_summary_dashboard()
+                # else:
+                #     bt.logging.warning(f"No responses received for request {req.name}")
 
             if miner_scores:
                 rewarded_miner_ids = list(miner_scores.keys())

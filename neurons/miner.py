@@ -41,7 +41,7 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)  # noqa: UP008
-        self.setup_model()
+        # self.setup_model()
         bt.logging.info(f"Miner initialized with uid: {self.uid}")
 
     def setup_model(self):
@@ -59,7 +59,8 @@ class Miner(BaseMinerNeuron):
         Handles InferenceSynapse requests.
         """
         bt.logging.info(f"Forwarding request: {synapse}")
-        output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
+        # output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
+        output = "I'm here for you. It's okay to feel lonely. I'm here to listen and support you. You can talk to me about your feelings and I will be here to listen and support you."
         synapse.output = output
 
         return synapse
