@@ -114,37 +114,7 @@ class OpenAIBatchLLMAsJudgeEval:
             else:
                 current_batch_miner_uids.append(miner_uid)
                 current_batch_responses.append(response.output)
-                current_word_count += response_word_count
-                
-        # Handle any in case of a single response only
-        # only for testing purpose
-        if current_batch_responses:
-            print("Creating final batch request")
-            custom_id = f"{request_id}_{request_number}"
-            request = {
-                "custom_id": custom_id,
-                "method": "POST",
-                "url": "/v1/chat/completions",
-                "body": {
-                    "model": self.judge_model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a strict and fair judge for therapy responses.",
-                        },
-                        {
-                            "role": "user",
-                            "content": self.create_judge_prompt(
-                                prompt, base_response, current_batch_responses
-                            ),
-                        },
-                    ],
-                    "max_tokens": 1000,
-                },
-            }
-            batch.append(request)
-            batch_metadata[custom_id] = ",".join(map(str, current_batch_miner_uids))
-        
+                current_word_count += response_word_count       
     
         all_batches.append((batch,  batch_metadata))
         return all_batches

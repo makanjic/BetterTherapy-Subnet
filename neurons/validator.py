@@ -34,8 +34,8 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
-        # self.setup_wandb()
-        # self.setup_model()
+        self.setup_wandb()
+        self.setup_model()
         self.setup_evals()
         self.setup_batch_evals()
         bt.logging.info(f"Validator initialized with uid: {self.uid}")
