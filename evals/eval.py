@@ -17,12 +17,12 @@ class OpenAILLMAsJudgeEval:
         Use LLM-as-Judge to determine numerical scores for each miner's response compared to the base response.
         Returns a list of float scores (0-1).
         """
-        numbered_responses = "\n".join(
+        numbered_responses = json.dumps("\n".join(
             [
                 f"Therapist {i + 1}: {resp if resp is not None else ''}"
                 for i, resp in enumerate(responses)
             ]
-        )
+        ))
         judge_prompt = (
             "You are an expert evaluator. Given the following prompt, the base response, and a set of therapist responses, "
             "score each therapist's response on a scale from 0 to 1. "

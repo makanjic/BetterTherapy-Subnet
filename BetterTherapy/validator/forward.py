@@ -92,21 +92,30 @@ async def forward(self: validator.Validator):
             f"Received total responses: {len(responses)}, batching them and queueing them to openai"
         )
         if responses:
-            batch_reponses, batch_metadata = self.batch_evals.create_batch(
+            batch_info = self.batch_evals.create_batch(
                 prompt, base_response, request_id, responses, miner_uids.tolist()
             )
-            openai_batch_response = self.batch_evals.queue_batch(
-                batch=batch_reponses, batch_metadata=batch_metadata
-            )
-            new_request = add_request(
-                name=request_id,
-                openai_batch_id=openai_batch_response.id,
-                prompt=prompt,
-                base_response=base_response,
-            )
+            bt.logging.info(f"Creating {len(batch_info)} batches")
+            openai_batch_ids = []
+            for i, (batch_requests, batch_metadata) in enumerate(batch_info):
+                bt.logging.info(f"Processing batch {i+1}/{len(batch_info)}")
+                bt.logging.info("Batch requests: ", len(batch_requests))
+
+                openai_batch_response = self.batch_evals.queue_batch(
+                    batch=batch_requests, batch_metadata=batch_metadata
+                )
+                openai_batch_ids.append(openai_batch_response.id)
+
+            for batch_id in openai_batch_ids:
+                new_request = add_request(
+                    name=f"{request_id}_{batch_id}",  # Make unique names
+                    openai_batch_id=batch_id,
+                    prompt=prompt,
+                    base_response=base_response,
+                )
+
             miner_responses = []
             for resp, miner_uid in zip(responses, miner_uids.tolist()):
-
                 miner_responses.append(
                     MinerResponse(
                         request_id=new_request.id,

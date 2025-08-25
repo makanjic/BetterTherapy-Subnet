@@ -140,6 +140,26 @@ def add_args(cls, parser):
         help="OpenAI api key",
         default=os.environ.get("OPENAI_API_KEY", None),
     )
+    parser.add_argument(
+        "--model.offload_to_cpu",
+        action="store_true",
+        help="If set, we offload the model to cpu.",
+        default=os.environ.get("MODEL_OFFLOAD_TO_CPU", False),
+    )
+
+    parser.add_argument(
+        "--model.vram_in_GiB",
+        type=str,
+        help="The amount of VRAM in GiB available for the model. Used to set max_memory.",
+        default=os.environ.get("MODEL_VRAM_IN_GiB", "14"),
+    )
+
+    parser.add_argument(
+        "--model.cpu_in_GiB",
+        type=str,
+        help="The amount of CPU RAM in GiB available for the model. Used to set max_memory.",
+        default=os.environ.get("MODEL_CPU_IN_GiB", "20"),
+    )
 
 
 def add_miner_args(cls, parser):
