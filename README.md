@@ -291,7 +291,7 @@ pm2 start uv --name bt-test-vali \
   --netuid <your_netuid> \
   --subtensor.chain_endpoint <endpoint> \
   --wallet.name bt-test-vali --wallet.hotkey default \
-  --logging.debug --axon.port 8091 --model.name meta-llama/Llama-3.1-8B-Instruct
+  --logging.debug --axon.port 8091 --model.name meta-llama/Llama-3.1-8B-Instruct --model.vram_in_GiB 16 --model.cpu_in_GiB 24
 ```
 
 PM2 commands for process management:
