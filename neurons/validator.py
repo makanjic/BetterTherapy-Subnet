@@ -44,10 +44,22 @@ class Validator(BaseValidatorNeuron):
         self.model_name = self.config.model.name
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+        if self.config.model.offload_to_cpu:
+            max_memory = {
+                0: self.config.model.vram_in_GiB,
+                "cpu": self.config.model.cpu_in_GiB,
+            }
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                device_map="auto",
+                max_memory=max_memory,
+                torch_dtype=torch.float16,
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+            if torch.cuda.is_available():
+                self.model.to("cuda")
         self.model.eval()
-        if torch.cuda.is_available():
-            self.model.to("cuda")
 
     def setup_batch_evals(self):
         api_key = self.config.openai.api_key
