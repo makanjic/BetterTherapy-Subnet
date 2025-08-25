@@ -46,8 +46,8 @@ class Validator(BaseValidatorNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         if self.config.model.offload_to_cpu:
             max_memory = {
-                0: self.config.model.vram_in_GiB,
-                "cpu": self.config.model.cpu_in_GiB,
+                0: self.config.model.vram_in_GiB + "GiB",
+                "cpu": self.config.model.cpu_in_GiB + "GiB",
             }
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
