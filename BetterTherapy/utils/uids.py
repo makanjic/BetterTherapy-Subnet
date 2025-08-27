@@ -1,4 +1,5 @@
 import random
+from typing import Dict, Optional
 
 import bittensor as bt
 import numpy as np
@@ -26,6 +27,39 @@ def check_uid_availability(
     return True
 
 
+def filter_uids(
+    self,
+    max_per_key: int = 15,
+    blacklist: Optional[list[int]] = None
+) -> np.ndarray:
+    """Return available uids filtered by blacklist and per-coldkey cap."""
+    available = []
+    counts: Dict[str, int] = {}
+
+    for uid in range(self.metagraph.n.item()):
+        ck = self.metagraph.coldkeys[uid]
+        hk = self.metagraph.hotkeys[uid]
+
+        if blacklist and hk in blacklist:
+            continue
+
+        cnt = counts.get(ck, 0)
+        if cnt >= max_per_key:
+            continue
+
+        neuron = self.metagraph.axons[uid]
+        if not neuron.is_serving:
+            continue
+
+        if self.metagraph.validator_permit[uid] and self.metagraph.S[uid] > self.config.neuron.vpermit_tao_limit:
+            continue
+
+        available.append(uid)
+        counts[ck] = cnt + 1
+
+    return np.array(available, dtype=int)
+
+
 def get_available_uids(self, k: int, exclude: list[int] = None) -> np.ndarray:
     """Returns k available random uids from the metagraph.
     Args:
@@ -49,8 +83,10 @@ def get_available_uids(self, k: int, exclude: list[int] = None) -> np.ndarray:
             avail_uids.append(uid)
             if uid_is_not_excluded:
                 candidate_uids.append(uid)
+                
+    filtered_uids = filter_uids(self)
     # If k is larger than the number of available uids, set k to the number of available uids.
-    k = min(k, len(avail_uids))
+    k = min(k, len(avail_uids), len(filtered_uids))
     # Check if candidate_uids contain enough for querying, if not grab all avaliable uids
     available_uids = candidate_uids
     if len(candidate_uids) < k:
@@ -58,5 +94,9 @@ def get_available_uids(self, k: int, exclude: list[int] = None) -> np.ndarray:
             [uid for uid in avail_uids if uid not in candidate_uids],
             k - len(candidate_uids),
         )
-    uids = np.array(avail_uids)
+    
+    uids_list = list(set(avail_uids).intersection(set(filtered_uids)))
+    uids = np.array(uids_list)
     return uids
+
+
