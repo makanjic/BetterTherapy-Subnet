@@ -49,6 +49,7 @@ class Miner(BaseMinerNeuron):
         super(Miner, self).__init__(config=config)  # noqa: UP008
         self.setup_model()
         self.datadir = os.path.expanduser(self.config.datadir)
+        self.temperature = os.getenv("OPENAI_TEMPERATURE", 0.7)
         bt.logging.info(f"Miner initialized with uid: {self.uid}")
         bt.logging.info(f"Data directory: {self.datadir}")
         if not os.path.exists(self.datadir):
@@ -156,6 +157,7 @@ class Miner(BaseMinerNeuron):
                     },
                     {"role": "user", "content": prompt},
                 ],
+                temperature=self.temperature
             )
             return response.choices[0].message.content
         except Exception as e:
