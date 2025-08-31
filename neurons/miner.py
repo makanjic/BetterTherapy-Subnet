@@ -83,7 +83,7 @@ class Miner(BaseMinerNeuron):
         if not os.path.exists(synapse_file):
             with open(synapse_file, "w") as f:
                 json.dump({
-                    "request_id": synapse.request_id
+                    "request_id": synapse.request_id,
                     "prompt": synapse.prompt,
                     "output": ""
                 }, f)
@@ -112,7 +112,7 @@ class Miner(BaseMinerNeuron):
                             output = content_json.get("output", "")
                             if request_id != synapse.request_id:
                                 break
-                            if output.strip() != ""
+                            if output.strip() != "":
                                 synapse.output = output.strip()
                                 return synapse
                         except:
