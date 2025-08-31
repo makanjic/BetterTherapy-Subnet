@@ -23,8 +23,7 @@ import ulid
 
 from BetterTherapy.protocol import InferenceSynapse
 from BetterTherapy.utils.llm import generate_response
-from BetterTherapy.utils.uids import get_available_uids
-from BetterTherapy.validator.reward import get_rewards
+from BetterTherapy.utils.uids import filter_uids
 from neurons import validator
 import traceback
 from BetterTherapy.db.query import (
@@ -50,7 +49,7 @@ async def forward(self: validator.Validator):
     # Define how the validator selects a miner to query, how often, etc.
     # get_random_uids is an example method, but you can replace it with your own.
     try:
-        miner_uids = get_available_uids(self, 256)
+        miner_uids = filter_uids(self)
         # The dendrite client queries the network.
         prompt_for_vali = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>  
     You are a compassionate mental health assistant.  
