@@ -200,6 +200,13 @@ def add_miner_args(cls, parser):
         help="Wandb entity to log to.",
     )
 
+    parser.add_argument(
+        "--model.name",
+        type=str,
+        help="The base model you are running",
+        default="gpt-3.5-turbo",
+    )
+
 
 def add_validator_args(cls, parser):
     """Add validator specific arguments to the parser."""

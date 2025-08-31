@@ -19,15 +19,16 @@ import time
 import typing
 
 import bittensor as bt
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+# import torch
+# from transformers import AutoModelForCausalLM, AutoTokenizer
+from openai import OpenAI
 
 # Bittensor Miner Template:
 import BetterTherapy
 
 # import base miner class which takes care of most of the boilerplate
 from BetterTherapy.base.miner import BaseMinerNeuron
-from BetterTherapy.utils.llm import generate_response
+# from BetterTherapy.utils.llm import generate_response
 
 
 class Miner(BaseMinerNeuron):
@@ -46,11 +47,12 @@ class Miner(BaseMinerNeuron):
 
     def setup_model(self):
         self.model_name = self.config.model.name
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
-        self.model.eval()
-        if torch.cuda.is_available():
-            self.model.to("cuda")
+        self.model = OpenAI()
+        # self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        # self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+        # self.model.eval()
+        # if torch.cuda.is_available():
+        #     self.model.to("cuda")
 
     async def forward(
         self, synapse: BetterTherapy.protocol.InferenceSynapse
@@ -59,7 +61,8 @@ class Miner(BaseMinerNeuron):
         Handles InferenceSynapse requests.
         """
         bt.logging.info(f"Forwarding request: {synapse}")
-        output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
+        output = self.generate_response(synapse.prompt)
+        # output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
         synapse.output = output
 
         return synapse
@@ -70,7 +73,8 @@ class Miner(BaseMinerNeuron):
         """
         try:
             response = self.model.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=self.model_name,
+                # model="gpt-3.5-turbo",
                 messages=[
                     {
                         "role": "system",
