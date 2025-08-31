@@ -207,6 +207,13 @@ def add_miner_args(cls, parser):
         default="gpt-3.5-turbo",
     )
 
+    parser.add_argument(
+        "--datadir",
+        type=str,
+        help="Data directory path.",
+        default="~/.bittensor/sn102",
+    )
+
 
 def add_validator_args(cls, parser):
     """Add validator specific arguments to the parser."""

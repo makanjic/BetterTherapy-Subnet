@@ -15,7 +15,10 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import sys
+import os
 import time
+import datetime
 import typing
 
 import bittensor as bt
@@ -30,6 +33,8 @@ import BetterTherapy
 from BetterTherapy.base.miner import BaseMinerNeuron
 # from BetterTherapy.utils.llm import generate_response
 
+import json
+
 
 class Miner(BaseMinerNeuron):
     """
@@ -43,7 +48,11 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)  # noqa: UP008
         self.setup_model()
+        self.datadir = os.path.expanduser(self.config.datadir)
         bt.logging.info(f"Miner initialized with uid: {self.uid}")
+        bt.logging.info(f"Data directory: {self.datadir}")
+        if not os.path.exists(self.datadir):
+            os.makedirs(self.datadir)
 
     def setup_model(self):
         self.model_name = self.config.model.name
@@ -61,9 +70,65 @@ class Miner(BaseMinerNeuron):
         Handles InferenceSynapse requests.
         """
         bt.logging.info(f"Forwarding request: {synapse}")
+        if not synapse.dendrite.hotkey:
+            bt.logging.error("Missing hotkey in dendrite.")
+            return synapse
+
+        validator_dir = os.path.join(self.datadir, synapse.dendrite.hotkey)
+        if not os.path.exists(validator_dir):
+            os.makedirs(validator_dir)
+
+        synapse_file = os.path.join(validator_dir, synapse.request_id)
+        if not os.path.exists(synapse_file):
+            with open(synapse_file, "w") as f:
+                json.dump({
+                    "request_id": synapse.request_id
+                    "prompt": synapse.prompt,
+                    "output": ""
+                }, f)
+        else:
+            mod_time = os.path.getmtime(synapse_file)
+            mod_datetime = datetime.datetime.fromtimestamp(mod_time)
+            now = datetime.datetime.now()
+            threshold = now - datetime.timedelta(minutes=5)
+            if mod_datetime < threshold:
+                with open(synapse_file, "w") as f:
+                    json.dump({
+                        "request_id": synapse.request_id,
+                        "prompt": synapse.prompt,
+                        "output": ""
+                    }, f)
+            else:
+                waited = 0
+                while waited < 5 * 60:
+                    content = ""
+                    with open(synapse_file, "r") as f:
+                        content = f.read()
+                    if content.strip() != "":
+                        try:
+                            content_json = json.loads(content.strip())
+                            request_id = content_json.get("request_id", "")
+                            output = content_json.get("output", "")
+                            if request_id != synapse.request_id:
+                                break
+                            if output.strip() != ""
+                                synapse.output = output.strip()
+                                return synapse
+                        except:
+                            break
+                    time.sleep(1)
+                    waited += 1
+
         output = self.generate_response(synapse.prompt)
         # output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
         synapse.output = output
+
+        with open(synapse_file, "w") as f:
+            json.dump({
+                "request_id": synapse.request_id,
+                "prompt": synapse.prompt,
+                "output": synapse.output
+            }, f)
 
         return synapse
 
