@@ -100,7 +100,7 @@ class Miner(BaseMinerNeuron):
                     }, f)
             else:
                 waited = 0
-                while waited < 5 * 60:
+                while waited < 15 * 60:
                     content = ""
                     with open(synapse_file, "r") as f:
                         content = f.read()
@@ -116,8 +116,8 @@ class Miner(BaseMinerNeuron):
                                 return synapse
                         except:
                             break
-                    time.sleep(1)
-                    waited += 1
+                    time.sleep(5)
+                    waited += 5
 
         output = self.generate_response(synapse.prompt)
         # output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
