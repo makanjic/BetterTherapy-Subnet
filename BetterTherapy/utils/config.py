@@ -208,10 +208,24 @@ def add_miner_args(cls, parser):
     )
 
     parser.add_argument(
-        "--datadir",
+        "--cache.dir",
         type=str,
-        help="Data directory path.",
+        help="Cache directory path.",
         default="~/.bittensor/sn102",
+    )
+
+    parser.add_argument(
+        "--cache.read",
+        action="store_true",
+        help="If set, miners will read cache first",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--cache.write",
+        action="store_true",
+        help="If set, miners will write cache at last",
+        default=False,
     )
 
 

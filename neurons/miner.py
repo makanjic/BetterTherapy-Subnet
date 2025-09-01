@@ -48,15 +48,26 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)  # noqa: UP008
         self.setup_model()
-        self.datadir = os.path.expanduser(self.config.datadir)
+        self.cache_dir = os.path.expanduser(self.config.cache.dir)
+        self.cache_read = self.config.cache.read
+        self.cache_write = self.config.cache.write
+
         try:
             self.temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.7))
         except:
             self.temperature = 0.7
         bt.logging.info(f"Miner initialized with uid: {self.uid}")
-        bt.logging.info(f"Data directory: {self.datadir}")
-        if not os.path.exists(self.datadir):
-            os.makedirs(self.datadir)
+        bt.logging.info(f"Cache directory: {self.cache_dir}")
+        if self.cache_read:
+            bt.logging.info("Miner reads cache")
+        else:
+            bt.logging.info(f"Miner does not read cache")
+        if self.cache_write:
+            bt.logging.info("Miner writes cache")
+        else:
+            bt.logging.info(f"Miner does not write cache")
+        if self.cache_write and not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
 
     def setup_model(self):
         self.model_name = self.config.model.name
@@ -78,35 +89,48 @@ class Miner(BaseMinerNeuron):
             bt.logging.error("Missing hotkey in dendrite.")
             return synapse
 
-        validator_dir = os.path.join(self.datadir, synapse.dendrite.hotkey)
-        if not os.path.exists(validator_dir):
+        validator_dir = os.path.join(self.cache_dir, synapse.dendrite.hotkey)
+        if self.cache_write and not os.path.exists(validator_dir):
             os.makedirs(validator_dir)
 
-        synapse_file = os.path.join(validator_dir, synapse.request_id)
-        if not os.path.exists(synapse_file):
-            with open(synapse_file, "w") as f:
+        cache_file = os.path.join(validator_dir, synapse.request_id)
+        cache_file_created = False
+
+        if self.cache_write and not os.path.exists(cache_file):
+            with open(cache_file, "w") as f:
                 json.dump({
                     "request_id": synapse.request_id,
                     "prompt": synapse.prompt,
                     "output": ""
                 }, f)
-        else:
-            mod_time = os.path.getmtime(synapse_file)
+            bt.logging.debug(f"Created new synapse file: {cache_file}")
+            cache_file_created = True
+        elif self.cache_write:
+            mod_time = os.path.getmtime(cache_file)
             mod_datetime = datetime.datetime.fromtimestamp(mod_time)
             now = datetime.datetime.now()
             threshold = now - datetime.timedelta(minutes=5)
             if mod_datetime < threshold:
-                with open(synapse_file, "w") as f:
+                with open(cache_file, "w") as f:
                     json.dump({
                         "request_id": synapse.request_id,
                         "prompt": synapse.prompt,
                         "output": ""
                     }, f)
-            else:
-                waited = 0
-                while waited < 15 * 60:
+                bt.logging.debug(f"Reset stale synapse file: {cache_file}")
+                cache_file_created = True
+
+        if self.cache_read and os.path.exists(cache_file) and not cache_file_created:
+            start_time = datetime.datetime.now()
+            mod_time = None
+            while (elapsed_secs := (datetime.datetime.now() - start_time).seconds) < 120:
+                current_mod_time = os.path.getmtime(cache_file)
+                if mod_time is not None and current_mod_time == mod_time:
+                    time.sleep(0.2)
+                else:
+                    mod_time = current_mod_time
                     content = ""
-                    with open(synapse_file, "r") as f:
+                    with open(cache_file, "r") as f:
                         content = f.read()
                     if content.strip() != "":
                         try:
@@ -114,25 +138,30 @@ class Miner(BaseMinerNeuron):
                             request_id = content_json.get("request_id", "")
                             output = content_json.get("output", "")
                             if request_id != synapse.request_id:
+                                bt.logging.debug(f"Request ID mismatch: {request_id} != {synapse.request_id}, elapsed {elapsed_secs} s")
                                 break
                             if output.strip() != "":
                                 synapse.output = output.strip()
+                                bt.logging.debug(f"Found output for request {synapse.request_id}: {synapse.output}, elapsed {elapsed_secs} s")
                                 return synapse
                         except:
+                            bt.logging.debug(f"Error reading synapse file: {cache_file}, elapsed {elapsed_secs} s")
                             break
-                    time.sleep(5)
-                    waited += 5
+                    time.sleep(0.1)
 
+        bt.logging.debug(f"Generating response for request {synapse.request_id}")
         output = self.generate_response(synapse.prompt)
         # output = generate_response(synapse.prompt, self.model, self.tokenizer, "miner")
         synapse.output = output
+        bt.logging.debug(f"Generated output: {synapse.output}")
 
-        with open(synapse_file, "w") as f:
-            json.dump({
-                "request_id": synapse.request_id,
-                "prompt": synapse.prompt,
-                "output": synapse.output
-            }, f)
+        if cache_file_created:
+            with open(cache_file, "w") as f:
+                json.dump({
+                    "request_id": synapse.request_id,
+                    "prompt": synapse.prompt,
+                    "output": synapse.output
+                }, f)
 
         return synapse
 
